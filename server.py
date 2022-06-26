@@ -1,46 +1,43 @@
-import socket
-from _thread import *
-import sys
+import socket 
+import threading
 
-server = "192.168.1.71"
-port = 5555
+HEADER = 64
+PORT = 5050
+SERVER = socket.gethostbyname(socket.gethostname())
+ADDR = (SERVER, PORT)
+FORMAT = 'utf-8'
+DISCONNECT_MESSAGE = "!DISCONNECT"
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.bind(ADDR)
 
-try:
-    s.bind((server, port))
-except socket.error as e:
-    str(e)
+def handle_client(conn, addr):
+    print(f"[NEW CONNECTION] {addr} connected.")
 
-s.listen(2)
-print("Waiting for a connection, Server Started")
+    connected = True
+    while connected:
+        msg_length = conn.recv(HEADER).decode(FORMAT)
+        if msg_length:
+            msg_length = int(msg_length)
+            msg = conn.recv(msg_length).decode(FORMAT)
+            if msg == DISCONNECT_MESSAGE:
+                connected = False
 
+            print(f"[{addr}] {msg}")
+            conn.send("Msg received".encode(FORMAT))
 
-def threaded_client(conn):
-    conn.send(str.encode("Connected"))
-    reply = ""
-    while True:
-        try:
-            data = conn.recv(2048)
-            reply = data.decode("utf-8")
-
-            if not data:
-                print("Disconnected")
-                break
-            else:
-                print("Received: ", reply)
-                print("Sending : ", reply)
-
-            conn.sendall(str.encode(reply))
-        except:
-            break
-
-    print("Lost connection")
     conn.close()
+        
+
+def start():
+    server.listen()
+    print(f"[LISTENING] Server is listening on {SERVER}")
+    while True:
+        conn, addr = server.accept()
+        thread = threading.Thread(target=handle_client, args=(conn, addr))
+        thread.start()
+        print(f"[ACTIVE CONNECTIONS] {threading.activeCount() - 1}")
 
 
-while True:
-    conn, addr = s.accept()
-    print("Connected to:", addr)
-
-    start_new_thread(threaded_client, (conn,))
+print("[STARTING] server is starting...")
+start()
